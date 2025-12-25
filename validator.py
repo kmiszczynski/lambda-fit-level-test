@@ -18,9 +18,19 @@ def validate_fitness_test_request(body: dict) -> Tuple[bool, str]:
     if 'results' not in body:
         return False, "Missing required field: results"
 
+    if 'pushups_type' not in body:
+        return False, "Missing required field: pushups_type"
+
     # Validate user_id
     if not isinstance(body['user_id'], str) or not body['user_id'].strip():
         return False, "user_id must be a non-empty string"
+
+    # Validate pushups_type
+    allowed_pushups_types = ['classic', 'knee', 'incline', 'wall']
+    if not isinstance(body['pushups_type'], str):
+        return False, "pushups_type must be a string"
+    if body['pushups_type'] not in allowed_pushups_types:
+        return False, f"pushups_type must be one of: {', '.join(allowed_pushups_types)}"
 
     # Validate results object
     results = body['results']

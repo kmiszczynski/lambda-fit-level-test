@@ -31,6 +31,7 @@ def lambda_handler(event, context):
     Expected POST body:
     {
         "user_id": "string",
+        "pushups_type": "classic" | "knee" | "incline" | "wall",
         "results": {
             "max_push_ups": int,
             "max_squats": int,
@@ -70,6 +71,7 @@ def lambda_handler(event, context):
         item = {
             'test_id': test_id,
             'user_id': body['user_id'],
+            'pushups_type': body['pushups_type'],
             'max_push_ups': body['results']['max_push_ups'],
             'max_squats': body['results']['max_squats'],
             'max_reverse_snow_angels_45s': body['results']['max_reverse_snow_angels_45s'],

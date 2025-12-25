@@ -49,6 +49,7 @@ class TestLambdaHandler:
         event = {
             'body': json.dumps({
                 "user_id": "user123",
+                "pushups_type": "classic",
                 "results": {
                     "max_push_ups": 50,
                     "max_squats": 100,
@@ -95,6 +96,7 @@ class TestLambdaHandler:
         """Test request without user_id."""
         event = {
             'body': json.dumps({
+                "pushups_type": "classic",
                 "results": {
                     "max_push_ups": 50,
                     "max_squats": 100,
@@ -117,7 +119,8 @@ class TestLambdaHandler:
         """Test request without results."""
         event = {
             'body': json.dumps({
-                "user_id": "user123"
+                "user_id": "user123",
+                "pushups_type": "classic"
             })
         }
         context = Mock()
@@ -134,6 +137,7 @@ class TestLambdaHandler:
         event = {
             'body': json.dumps({
                 "user_id": "user123",
+                "pushups_type": "classic",
                 "results": {
                     "max_push_ups": 50,
                     "max_squats": 100,
@@ -157,6 +161,7 @@ class TestLambdaHandler:
         event = {
             'body': json.dumps({
                 "user_id": "user123",
+                "pushups_type": "classic",
                 "results": {
                     "max_push_ups": -10,
                     "max_squats": 100,
@@ -180,6 +185,7 @@ class TestLambdaHandler:
         event = {
             'body': {
                 "user_id": "user123",
+                "pushups_type": "classic",
                 "results": {
                     "max_push_ups": 50,
                     "max_squats": 100,
@@ -202,6 +208,7 @@ class TestLambdaHandler:
         event = {
             'body': json.dumps({
                 "user_id": "user123",
+                "pushups_type": "classic",
                 "results": {
                     "max_push_ups": 0,
                     "max_squats": 0,
@@ -217,3 +224,50 @@ class TestLambdaHandler:
 
         assert response['statusCode'] == 200
         assert response['body'] == ''
+
+    def test_missing_pushups_type(self):
+        """Test request without pushups_type."""
+        event = {
+            'body': json.dumps({
+                "user_id": "user123",
+                "results": {
+                    "max_push_ups": 50,
+                    "max_squats": 100,
+                    "max_reverse_snow_angels_45s": 30,
+                    "plank_max_time_seconds": 120,
+                    "mountain_climbers_45s": 80
+                }
+            })
+        }
+        context = Mock()
+
+        response = lambda_handler(event, context)
+
+        assert response['statusCode'] == 400
+        body = json.loads(response['body'])
+        assert 'error' in body
+        assert 'pushups_type' in body['error']
+
+    def test_invalid_pushups_type(self):
+        """Test request with invalid pushups_type."""
+        event = {
+            'body': json.dumps({
+                "user_id": "user123",
+                "pushups_type": "invalid_type",
+                "results": {
+                    "max_push_ups": 50,
+                    "max_squats": 100,
+                    "max_reverse_snow_angels_45s": 30,
+                    "plank_max_time_seconds": 120,
+                    "mountain_climbers_45s": 80
+                }
+            })
+        }
+        context = Mock()
+
+        response = lambda_handler(event, context)
+
+        assert response['statusCode'] == 400
+        body = json.loads(response['body'])
+        assert 'error' in body
+        assert 'pushups_type' in body['error']
