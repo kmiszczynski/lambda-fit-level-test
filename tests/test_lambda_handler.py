@@ -19,6 +19,7 @@ class TestLambdaHandler:
         os.environ['AWS_SESSION_TOKEN'] = 'testing'
         os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
         os.environ['DYNAMODB_TABLE_NAME'] = 'test-fitness-results'
+        os.environ['USER_LEVELS_TABLE_NAME'] = 'test-user-levels'
 
         # Reset the cached db_service between tests
         import lambda_handler as lh
@@ -27,11 +28,13 @@ class TestLambdaHandler:
         lh._db_service = None
 
     @pytest.fixture
-    def dynamodb_table(self, aws_credentials):
-        """Create a mock DynamoDB table."""
+    def dynamodb_tables(self, aws_credentials):
+        """Create mock DynamoDB tables."""
         with mock_aws():
             dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
-            table = dynamodb.create_table(
+
+            # Create test_results table
+            test_results_table = dynamodb.create_table(
                 TableName='test-fitness-results',
                 KeySchema=[
                     {'AttributeName': 'test_id', 'KeyType': 'HASH'}
@@ -41,10 +44,26 @@ class TestLambdaHandler:
                 ],
                 BillingMode='PAY_PER_REQUEST'
             )
-            yield table
+
+            # Create user_levels table
+            user_levels_table = dynamodb.create_table(
+                TableName='test-user-levels',
+                KeySchema=[
+                    {'AttributeName': 'user_level_id', 'KeyType': 'HASH'}
+                ],
+                AttributeDefinitions=[
+                    {'AttributeName': 'user_level_id', 'AttributeType': 'S'}
+                ],
+                BillingMode='PAY_PER_REQUEST'
+            )
+
+            yield {
+                'test_results': test_results_table,
+                'user_levels': user_levels_table
+            }
 
     @mock_aws
-    def test_successful_request(self, aws_credentials, dynamodb_table):
+    def test_successful_request(self, aws_credentials, dynamodb_tables):
         """Test a successful fitness test submission."""
         event = {
             'body': json.dumps({
@@ -64,7 +83,28 @@ class TestLambdaHandler:
         response = lambda_handler(event, context)
 
         assert response['statusCode'] == 200
-        assert response['body'] == ''
+
+        # Parse response body
+        response_body = json.loads(response['body'])
+
+        # Verify response structure
+        assert 'user_level_id' in response_body
+        assert 'test_id' in response_body
+        assert 'levels' in response_body
+
+        # Verify levels structure
+        levels = response_body['levels']
+        assert 'per_category' in levels
+        assert 'global_level' in levels
+        assert 'global_level_raw_avg_points' in levels
+
+        # Verify category levels
+        assert levels['per_category']['LOWER'] == 'ADVANCED'  # 100 squats
+        assert levels['per_category']['PUSH'] == 'ADVANCED'   # classic 50 reps
+        assert levels['per_category']['PULL'] == 'ADVANCED'   # 30 angels
+        assert levels['per_category']['CORE'] == 'ADVANCED'   # 120s plank
+        assert levels['per_category']['COND'] == 'ADVANCED'   # 80 climbers
+        assert levels['global_level'] == 'ADVANCED'
 
     def test_missing_body(self):
         """Test request without body."""
@@ -180,7 +220,7 @@ class TestLambdaHandler:
         assert 'error' in body
 
     @mock_aws
-    def test_body_as_dict(self, aws_credentials, dynamodb_table):
+    def test_body_as_dict(self, aws_credentials, dynamodb_tables):
         """Test request where body is already a dict (not stringified)."""
         event = {
             'body': {
@@ -200,10 +240,11 @@ class TestLambdaHandler:
         response = lambda_handler(event, context)
 
         assert response['statusCode'] == 200
-        assert response['body'] == ''
+        response_body = json.loads(response['body'])
+        assert 'levels' in response_body
 
     @mock_aws
-    def test_zero_values(self, aws_credentials, dynamodb_table):
+    def test_zero_values(self, aws_credentials, dynamodb_tables):
         """Test request with zero values for exercises."""
         event = {
             'body': json.dumps({
@@ -223,7 +264,16 @@ class TestLambdaHandler:
         response = lambda_handler(event, context)
 
         assert response['statusCode'] == 200
-        assert response['body'] == ''
+        response_body = json.loads(response['body'])
+
+        # All zeros should result in BEGINNER levels
+        levels = response_body['levels']
+        assert levels['global_level'] == 'BEGINNER'
+        assert levels['per_category']['LOWER'] == 'BEGINNER'
+        assert levels['per_category']['PUSH'] == 'BEGINNER'
+        assert levels['per_category']['PULL'] == 'BEGINNER'
+        assert levels['per_category']['CORE'] == 'BEGINNER'
+        assert levels['per_category']['COND'] == 'BEGINNER'
 
     def test_missing_pushups_type(self):
         """Test request without pushups_type."""

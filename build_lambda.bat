@@ -12,6 +12,7 @@ REM Copy only the required Python files (boto3 is already in AWS Lambda runtime)
 copy lambda_handler.py package\
 copy db_service.py package\
 copy validator.py package\
+copy level_calculator.py package\
 
 REM Create ZIP file
 cd package
